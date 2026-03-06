@@ -1,11 +1,267 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>我的个人主页</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字生成 SVG 工具</title>
+    <style>
+        :root {
+            color-scheme: light;
+        }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif;
+            background: #f6f8fa;
+            color: #1f2328;
+        }
+        .container {
+            max-width: 960px;
+            margin: 32px auto;
+            padding: 0 16px;
+        }
+        h1 {
+            margin-bottom: 8px;
+            font-size: 28px;
+        }
+        .desc {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #59636e;
+        }
+        .panel {
+            background: #fff;
+            border: 1px solid #d1d9e0;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 2px rgba(31, 35, 40, 0.04);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        input, select, textarea, button {
+            font: inherit;
+        }
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #d1d9e0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            background: #fff;
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 14px 0;
+        }
+        button {
+            border: 1px solid #1f6feb;
+            border-radius: 8px;
+            background: #1f6feb;
+            color: #fff;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button.secondary {
+            background: #fff;
+            color: #1f6feb;
+        }
+        .output {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        #previewBox {
+            border: 1px dashed #8c959f;
+            border-radius: 8px;
+            background: #fff;
+            min-height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            padding: 8px;
+        }
+        .tip {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #59636e;
+        }
+    </style>
 </head>
 <body>
-    <h1>yufeiaiyaqi.eu.cc 已经成功运行！</h1>
-    <p>这是通过 GitHub Pages 托管的第一个页面。</p>
+    <div class="container">
+        <h1>文字生成 SVG 程序</h1>
+        <p class="desc">输入文字后，点击“生成 SVG”即可得到代码、预览并下载文件。</p>
+
+        <div class="panel">
+            <label for="textInput">文字内容（支持多行）</label>
+            <textarea id="textInput">你好，SVG！</textarea>
+
+            <div class="grid">
+                <div>
+                    <label for="fontSize">字体大小（px）</label>
+                    <input id="fontSize" type="number" min="8" max="300" value="48">
+                </div>
+                <div>
+                    <label for="padding">内边距（px）</label>
+                    <input id="padding" type="number" min="0" max="300" value="24">
+                </div>
+                <div>
+                    <label for="fontFamily">字体</label>
+                    <input id="fontFamily" type="text" value="Arial, 'Microsoft YaHei', sans-serif">
+                </div>
+                <div>
+                    <label for="fillColor">文字颜色</label>
+                    <input id="fillColor" type="color" value="#111111">
+                </div>
+                <div>
+                    <label for="bgColor">背景色</label>
+                    <input id="bgColor" type="color" value="#ffffff">
+                </div>
+            </div>
+
+            <div class="actions">
+                <button id="generateBtn" type="button">生成 SVG</button>
+                <button id="downloadBtn" class="secondary" type="button">下载 SVG</button>
+                <button id="copyBtn" class="secondary" type="button">复制 SVG 代码</button>
+            </div>
+
+            <div class="output">
+                <div>
+                    <label for="svgOutput">SVG 代码</label>
+                    <textarea id="svgOutput" readonly></textarea>
+                </div>
+                <div>
+                    <label>预览</label>
+                    <div id="previewBox"></div>
+                </div>
+            </div>
+
+            <div class="tip">提示：宽高根据文字自动计算；如需透明背景，请下载后手动移除 &lt;rect&gt; 节点。</div>
+        </div>
+    </div>
+
+    <script>
+        const textInput = document.getElementById("textInput");
+        const fontSizeInput = document.getElementById("fontSize");
+        const paddingInput = document.getElementById("padding");
+        const fontFamilyInput = document.getElementById("fontFamily");
+        const fillColorInput = document.getElementById("fillColor");
+        const bgColorInput = document.getElementById("bgColor");
+        const svgOutput = document.getElementById("svgOutput");
+        const previewBox = document.getElementById("previewBox");
+        const generateBtn = document.getElementById("generateBtn");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const copyBtn = document.getElementById("copyBtn");
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        function escapeXml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;");
+        }
+
+        function buildSvgFromText() {
+            const content = textInput.value || "";
+            const lines = content.split(/\r?\n/);
+            const fontSize = Math.max(8, Number(fontSizeInput.value) || 48);
+            const padding = Math.max(0, Number(paddingInput.value) || 24);
+            const fontFamily = fontFamilyInput.value.trim() || "sans-serif";
+            const fillColor = fillColorInput.value;
+            const bgColor = bgColorInput.value;
+
+            if (ctx) {
+                ctx.font = fontSize + "px " + fontFamily;
+            }
+
+            let maxWidth = 0;
+            for (const line of lines) {
+                const lineWidth = ctx ? ctx.measureText(line).width : line.length * fontSize;
+                if (lineWidth > maxWidth) maxWidth = lineWidth;
+            }
+
+            const lineHeight = Math.round(fontSize * 1.4);
+            const width = Math.ceil(maxWidth + padding * 2);
+            const height = Math.ceil(lineHeight * lines.length + padding * 2);
+
+            const textNodes = lines.map((line, index) => {
+                const y = padding + fontSize + index * lineHeight;
+                return "  <text x=\"" + padding + "\" y=\"" + y + "\">" + escapeXml(line) + "</text>";
+            }).join("\n");
+
+            const svg =
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + width + "\" height=\"" + height + "\" viewBox=\"0 0 " + width + " " + height + "\">\n" +
+                "  <rect width=\"100%\" height=\"100%\" fill=\"" + bgColor + "\"/>\n" +
+                "  <g font-size=\"" + fontSize + "\" font-family=\"" + escapeXml(fontFamily) + "\" fill=\"" + fillColor + "\">\n" +
+                textNodes + "\n" +
+                "  </g>\n" +
+                "</svg>";
+
+            return svg;
+        }
+
+        function render() {
+            const svg = buildSvgFromText();
+            svgOutput.value = svg;
+            previewBox.innerHTML = svg;
+        }
+
+        function downloadSvg() {
+            if (!svgOutput.value) render();
+            const blob = new Blob([svgOutput.value], { type: "image/svg+xml;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "text.svg";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function copySvg() {
+            if (!svgOutput.value) render();
+            try {
+                await navigator.clipboard.writeText(svgOutput.value);
+                copyBtn.textContent = "已复制";
+                setTimeout(() => {
+                    copyBtn.textContent = "复制 SVG 代码";
+                }, 1200);
+            } catch (err) {
+                copyBtn.textContent = "复制失败";
+                setTimeout(() => {
+                    copyBtn.textContent = "复制 SVG 代码";
+                }, 1200);
+            }
+        }
+
+        generateBtn.addEventListener("click", render);
+        downloadBtn.addEventListener("click", downloadSvg);
+        copyBtn.addEventListener("click", copySvg);
+
+        render();
+    </script>
 </body>
 </html>
