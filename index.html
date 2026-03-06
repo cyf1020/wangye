@@ -1,11 +1,1214 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>我的个人主页</title>
-</head>
-<body>
-    <h1>yufeiaiyaqi.eu.cc 已经成功运行！</h1>
-    <p>这是通过 GitHub Pages 托管的第一个页面。</p>
-</body>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SVG Studio Pro</title>
+    <script>
+      tailwind = { config: { darkMode: "class" } };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto:wght@400;700&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+      }
+
+      #app {
+        min-height: 100%;
+      }
+
+      .checker-bg {
+        background-color: #f8fafc;
+        background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%),
+          linear-gradient(-45deg, #e2e8f0 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #e2e8f0 75%),
+          linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+        background-size: 24px 24px;
+        background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+      }
+
+      .dark .checker-bg {
+        background-color: #0f172a;
+        background-image: linear-gradient(45deg, #1e293b 25%, transparent 25%),
+          linear-gradient(-45deg, #1e293b 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #1e293b 75%),
+          linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+      }
+
+      svg .node-selected {
+        filter: drop-shadow(0 0 2px rgba(59, 130, 246, 0.85));
+      }
+
+      .monaco-line-highlight {
+        background: rgba(59, 130, 246, 0.22);
+      }
+    </style>
+  </head>
+  <body class="bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div id="app"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+
+    <script type="text/babel">
+      const { useEffect, useMemo, useRef, useState } = React;
+
+      const STORAGE_KEY = "svg-studio-state-v1";
+      const DEFAULT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="700" height="260" viewBox="0 0 700 260">
+  <defs>
+    <linearGradient id="demo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect id="bg" width="700" height="260" rx="24" fill="#0f172a"/>
+  <text id="title" x="48" y="130" font-size="66" font-family="Inter, sans-serif" font-weight="700" fill="url(#demo-gradient)">
+    SVG Studio Pro
+  </text>
+  <text id="sub-title" x="50" y="188" font-size="24" fill="#94a3b8">文字转SVG / 图片转SVG / 实时编辑预览</text>
+</svg>`;
+
+      const FONT_OPTIONS = [
+        "Inter",
+        "Roboto",
+        "Montserrat",
+        "Poppins",
+        "JetBrains Mono",
+        "Arial",
+        "Georgia",
+      ];
+
+      const PRESETS = [
+        { label: "扁平", value: "flat" },
+        { label: "轮廓", value: "outline" },
+        { label: "渐变", value: "gradient" },
+      ];
+
+      function cls(...v) {
+        return v.filter(Boolean).join(" ");
+      }
+
+      function cssEscape(value) {
+        if (window.CSS && CSS.escape) return CSS.escape(value);
+        return value.replace(
+          /([ #;?%&,.+*~\':"!^$[\]()=>|/@])/g,
+          "\\$1"
+        );
+      }
+
+      function formatXml(xml) {
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(xml, "image/svg+xml");
+          if (doc.querySelector("parsererror")) return xml;
+          const serializer = new XMLSerializer();
+          const raw = serializer.serializeToString(doc.documentElement);
+          const split = raw.replace(/>\s*</g, "><").replace(/></g, ">\n<");
+          const lines = split.split("\n");
+          let indent = 0;
+          const out = [];
+          for (const lineRaw of lines) {
+            const line = lineRaw.trim();
+            if (!line) continue;
+            if (line.match(/^<\//)) indent = Math.max(indent - 1, 0);
+            out.push(`${"  ".repeat(indent)}${line}`);
+            if (
+              line.match(/^<[^!?/][^>]*[^/]>/) &&
+              !line.includes("</") &&
+              !line.startsWith("<svg")
+            ) {
+              indent += 1;
+            }
+            if (line.startsWith("<svg") && !line.endsWith("/>")) indent += 1;
+            if (line === "</svg>") indent = 0;
+          }
+          return out.join("\n");
+        } catch (e) {
+          return xml;
+        }
+      }
+
+      function serializeSvgNode(svgNode) {
+        return new XMLSerializer().serializeToString(svgNode);
+      }
+
+      function safeJsonParse(value, fallback) {
+        try {
+          return JSON.parse(value);
+        } catch (e) {
+          return fallback;
+        }
+      }
+
+      function decodeShareHash(hash) {
+        if (!hash || !hash.startsWith("#svg=")) return null;
+        try {
+          const encoded = hash.slice(5);
+          const raw = atob(encoded);
+          const decoded = decodeURIComponent(
+            raw
+              .split("")
+              .map((ch) => "%" + ch.charCodeAt(0).toString(16).padStart(2, "0"))
+              .join("")
+          );
+          return decoded;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function encodeShareHash(svg) {
+        const utf8 = encodeURIComponent(svg).replace(
+          /%([0-9A-F]{2})/g,
+          (_, p1) => String.fromCharCode(parseInt(p1, 16))
+        );
+        return btoa(utf8);
+      }
+
+      function MonacoEditor({ value, onChange, editorRef }) {
+        const hostRef = useRef(null);
+
+        useEffect(() => {
+          let disposed = false;
+          if (!window.require || !hostRef.current) return;
+          window.require.config({
+            paths: {
+              vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs",
+            },
+          });
+          window.require(["vs/editor/editor.main"], () => {
+            if (disposed || !hostRef.current) return;
+            const editor = window.monaco.editor.create(hostRef.current, {
+              value,
+              language: "xml",
+              theme: document.documentElement.classList.contains("dark")
+                ? "vs-dark"
+                : "vs",
+              automaticLayout: true,
+              fontSize: 14,
+              minimap: { enabled: false },
+              tabSize: 2,
+              formatOnPaste: true,
+              formatOnType: true,
+            });
+            editorRef.current = editor;
+            const modelSub = editor.onDidChangeModelContent(() => {
+              onChange(editor.getValue());
+            });
+            editor.__disposeModelSub = modelSub;
+          });
+          return () => {
+            disposed = true;
+            if (editorRef.current) {
+              editorRef.current.__disposeModelSub?.dispose?.();
+              editorRef.current.dispose();
+              editorRef.current = null;
+            }
+          };
+        }, []);
+
+        useEffect(() => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          if (editor.getValue() !== value) {
+            editor.setValue(value);
+          }
+        }, [value]);
+
+        return <div ref={hostRef} className="h-full w-full" />;
+      }
+
+      function App() {
+        const fromHash = decodeShareHash(window.location.hash);
+        const fromStorage = safeJsonParse(localStorage.getItem(STORAGE_KEY), {});
+
+        const [darkMode, setDarkMode] = useState(
+          Boolean(fromStorage.darkMode ?? true)
+        );
+        const [activeTab, setActiveTab] = useState("text");
+        const [svgCode, setSvgCode] = useState(
+          formatXml(fromHash || fromStorage.svgCode || DEFAULT_SVG)
+        );
+        const [textForm, setTextForm] = useState(
+          fromStorage.textForm || {
+            text: "你好，SVG 世界！",
+            fontFamily: "Inter",
+            fontSize: 72,
+            fill: "#111827",
+            stroke: "none",
+            strokeWidth: 0,
+            preset: "flat",
+          }
+        );
+        const [imgOpts, setImgOpts] = useState(
+          fromStorage.imgOpts || { maxEdge: 220, maxColors: 12 }
+        );
+        const [apiConfig, setApiConfig] = useState(
+          fromStorage.apiConfig || { endpoint: "", apiKey: "" }
+        );
+        const [status, setStatus] = useState("");
+        const [historyList, setHistoryList] = useState(fromStorage.history || []);
+        const [selectedId, setSelectedId] = useState("");
+        const [selectedFill, setSelectedFill] = useState("#000000");
+        const [selectedStroke, setSelectedStroke] = useState("#000000");
+        const [selectedStrokeWidth, setSelectedStrokeWidth] = useState(1);
+        const [zoom, setZoom] = useState(1);
+        const [pan, setPan] = useState({ x: 0, y: 0 });
+        const [bgMode, setBgMode] = useState("checker");
+        const [draggingImage, setDraggingImage] = useState(false);
+        const [fileForImage, setFileForImage] = useState(null);
+        const [isBusy, setIsBusy] = useState(false);
+
+        const previewRef = useRef(null);
+        const editorRef = useRef(null);
+        const fileOpenRef = useRef(null);
+        const fileImageRef = useRef(null);
+        const panRef = useRef({ active: false, x: 0, y: 0 });
+        const lastSelectedNodeRef = useRef(null);
+        const lineDecorationsRef = useRef([]);
+
+        useEffect(() => {
+          document.documentElement.classList.toggle("dark", darkMode);
+        }, [darkMode]);
+
+        useEffect(() => {
+          const timer = setTimeout(() => {
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({
+                darkMode,
+                svgCode,
+                textForm,
+                imgOpts,
+                apiConfig,
+                history: historyList.slice(0, 12),
+              })
+            );
+          }, 260);
+          return () => clearTimeout(timer);
+        }, [darkMode, svgCode, textForm, imgOpts, apiConfig, historyList]);
+
+        const layers = useMemo(() => {
+          try {
+            const doc = new DOMParser().parseFromString(svgCode, "image/svg+xml");
+            const root = doc.documentElement;
+            if (!root || root.tagName.toLowerCase() !== "svg") return [];
+            return Array.from(root.children).map((el, idx) => ({
+              id: el.getAttribute("id") || `layer-${idx}`,
+              tag: el.tagName,
+              index: idx,
+            }));
+          } catch {
+            return [];
+          }
+        }, [svgCode]);
+
+        function pushHistory(name, nextSvg) {
+          const item = {
+            id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+            name,
+            time: new Date().toLocaleString(),
+            svg: nextSvg,
+          };
+          setHistoryList((prev) => [item, ...prev].slice(0, 12));
+        }
+
+        function setSvgAndTrack(nextSvg, actionName) {
+          const formatted = formatXml(nextSvg);
+          setSvgCode(formatted);
+          if (actionName) pushHistory(actionName, formatted);
+        }
+
+        function showMessage(msg) {
+          setStatus(msg);
+          setTimeout(() => setStatus(""), 2200);
+        }
+
+        function locateIdInEditor(id) {
+          if (!id || !editorRef.current || !window.monaco) return;
+          const lines = svgCode.split("\n");
+          const lineIdx = lines.findIndex((l) => l.includes(`id="${id}"`));
+          if (lineIdx < 0) return;
+          const editor = editorRef.current;
+          editor.revealLineInCenter(lineIdx + 1);
+          lineDecorationsRef.current = editor.deltaDecorations(
+            lineDecorationsRef.current,
+            [
+              {
+                range: new window.monaco.Range(lineIdx + 1, 1, lineIdx + 1, 1),
+                options: { isWholeLine: true, className: "monaco-line-highlight" },
+              },
+            ]
+          );
+        }
+
+        function syncCodeFromPreview() {
+          const svg = previewRef.current?.querySelector("svg");
+          if (!svg) return;
+          const next = serializeSvgNode(svg);
+          setSvgCode(formatXml(next));
+        }
+
+        function refreshSelectedStylePanel(id) {
+          const node = previewRef.current?.querySelector(`#${cssEscape(id)}`);
+          if (!node) return;
+          const fill = node.getAttribute("fill");
+          const stroke = node.getAttribute("stroke");
+          const strokeWidth = Number(node.getAttribute("stroke-width") || 1);
+          if (fill && fill.startsWith("#")) setSelectedFill(fill);
+          if (stroke && stroke.startsWith("#")) setSelectedStroke(stroke);
+          setSelectedStrokeWidth(strokeWidth || 1);
+        }
+
+        useEffect(() => {
+          const container = previewRef.current;
+          if (!container) return;
+          container.innerHTML = "";
+
+          const doc = new DOMParser().parseFromString(svgCode, "image/svg+xml");
+          const root = doc.documentElement;
+          if (!root || root.tagName.toLowerCase() !== "svg") {
+            container.innerHTML =
+              '<div class="text-red-500 p-4">SVG 解析失败，请检查代码。</div>';
+            return;
+          }
+
+          const wrapper = document.createElement("div");
+          wrapper.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+          wrapper.style.transformOrigin = "top left";
+          wrapper.className = "inline-block";
+
+          const mountedSvg = document.importNode(root, true);
+          mountedSvg.style.maxWidth = "none";
+          mountedSvg.style.height = "auto";
+          wrapper.appendChild(mountedSvg);
+          container.appendChild(wrapper);
+
+          const onClick = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (!(ev.target instanceof SVGElement)) return;
+            const target = ev.target;
+            if (target.tagName.toLowerCase() === "svg") return;
+
+            if (lastSelectedNodeRef.current) {
+              lastSelectedNodeRef.current.classList.remove("node-selected");
+            }
+
+            if (!target.id) {
+              target.setAttribute(
+                "id",
+                `node-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`
+              );
+              syncCodeFromPreview();
+            }
+            target.classList.add("node-selected");
+            lastSelectedNodeRef.current = target;
+
+            setSelectedId(target.id);
+            refreshSelectedStylePanel(target.id);
+            locateIdInEditor(target.id);
+          };
+
+          mountedSvg.addEventListener("click", onClick);
+          return () => {
+            mountedSvg.removeEventListener("click", onClick);
+          };
+        }, [svgCode, zoom, pan]);
+
+        useEffect(() => {
+          if (!selectedId) return;
+          const node = previewRef.current?.querySelector(`#${cssEscape(selectedId)}`);
+          if (!node) return;
+          if (lastSelectedNodeRef.current) {
+            lastSelectedNodeRef.current.classList.remove("node-selected");
+          }
+          node.classList.add("node-selected");
+          lastSelectedNodeRef.current = node;
+          refreshSelectedStylePanel(selectedId);
+          locateIdInEditor(selectedId);
+        }, [selectedId, svgCode]);
+
+        async function generateTextSvg() {
+          if (!textForm.text.trim()) {
+            showMessage("请输入文本后再生成");
+            return;
+          }
+          setIsBusy(true);
+          try {
+            const res = await fetch("/api/text-to-svg", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...textForm,
+                apiEndpoint: apiConfig.endpoint,
+                apiKey: apiConfig.apiKey,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "生成失败");
+            setSvgAndTrack(data.svg, `文字转SVG (${data.source})`);
+            showMessage(`文字转SVG成功（${data.source}）`);
+          } catch (e) {
+            showMessage(`文字转SVG失败：${e.message}`);
+          } finally {
+            setIsBusy(false);
+          }
+        }
+
+        async function generateImageSvg() {
+          if (!fileForImage) {
+            showMessage("请先上传图片");
+            return;
+          }
+          setIsBusy(true);
+          try {
+            const formData = new FormData();
+            formData.append("file", fileForImage);
+            formData.append("maxEdge", String(imgOpts.maxEdge));
+            formData.append("maxColors", String(imgOpts.maxColors));
+            formData.append("apiEndpoint", apiConfig.endpoint || "");
+            formData.append("apiKey", apiConfig.apiKey || "");
+
+            const res = await fetch("/api/image-to-svg", {
+              method: "POST",
+              body: formData,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "转换失败");
+            setSvgAndTrack(data.svg, `图片转SVG (${data.source})`);
+            showMessage(`图片转SVG成功（${data.source}）`);
+          } catch (e) {
+            showMessage(`图片转SVG失败：${e.message}`);
+          } finally {
+            setIsBusy(false);
+          }
+        }
+
+        function handleOpenLocalSvg(file) {
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const text = String(reader.result || "");
+            setSvgAndTrack(text, "打开本地SVG");
+            showMessage("已打开本地SVG");
+          };
+          reader.readAsText(file);
+        }
+
+        function downloadSvg() {
+          const blob = new Blob([svgCode], { type: "image/svg+xml;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "drawing.svg";
+          a.click();
+          URL.revokeObjectURL(url);
+          showMessage("SVG 文件已保存");
+        }
+
+        async function copyCode() {
+          await navigator.clipboard.writeText(svgCode);
+          showMessage("SVG 代码已复制");
+        }
+
+        async function exportViaApi(format) {
+          setIsBusy(true);
+          try {
+            const res = await fetch("/api/export", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ svg: svgCode, format }),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.error || "导出失败");
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `export.${format}`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showMessage(`已导出 ${format.toUpperCase()}`);
+          } catch (e) {
+            showMessage(`导出失败：${e.message}`);
+          } finally {
+            setIsBusy(false);
+          }
+        }
+
+        async function optimizeSvgCode() {
+          setIsBusy(true);
+          try {
+            const res = await fetch("/api/optimize-svg", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ svg: svgCode }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "优化失败");
+            setSvgAndTrack(data.svg, "优化SVG");
+            showMessage("SVG 已优化");
+          } catch (e) {
+            showMessage(`优化失败：${e.message}`);
+          } finally {
+            setIsBusy(false);
+          }
+        }
+
+        function applyStyleToSelected(attr, value) {
+          if (!selectedId) {
+            showMessage("请先在画布中点击一个元素");
+            return;
+          }
+          const node = previewRef.current?.querySelector(
+            `#${cssEscape(selectedId)}`
+          );
+          if (!node) {
+            showMessage("当前选中元素不存在");
+            return;
+          }
+          node.setAttribute(attr, value);
+          syncCodeFromPreview();
+          refreshSelectedStylePanel(selectedId);
+        }
+
+        function moveLayer(direction) {
+          if (!selectedId) {
+            showMessage("请先选择一个图层元素");
+            return;
+          }
+          const node = previewRef.current?.querySelector(
+            `#${cssEscape(selectedId)}`
+          );
+          if (!node || !node.parentNode) return;
+          const parent = node.parentNode;
+          if (direction === "up" && node.nextElementSibling) {
+            parent.insertBefore(node.nextElementSibling, node);
+          } else if (direction === "down" && node.previousElementSibling) {
+            parent.insertBefore(node, node.previousElementSibling);
+          }
+          syncCodeFromPreview();
+        }
+
+        function newDocument() {
+          setSvgAndTrack(DEFAULT_SVG, "新建文档");
+          setSelectedId("");
+          setZoom(1);
+          setPan({ x: 0, y: 0 });
+          showMessage("已新建文档");
+        }
+
+        function formatInEditor() {
+          const formatted = formatXml(svgCode);
+          setSvgCode(formatted);
+          editorRef.current?.getAction?.("editor.action.formatDocument")?.run?.();
+          showMessage("代码已格式化");
+        }
+
+        function undoEditor() {
+          editorRef.current?.trigger("keyboard", "undo", null);
+        }
+
+        function redoEditor() {
+          editorRef.current?.trigger("keyboard", "redo", null);
+        }
+
+        async function shareLink() {
+          const hash = encodeShareHash(svgCode);
+          const url = `${location.origin}${location.pathname}#svg=${hash}`;
+          window.history.replaceState(null, "", `#svg=${hash}`);
+          await navigator.clipboard.writeText(url);
+          showMessage("分享链接已复制");
+        }
+
+        function onDropImage(ev) {
+          ev.preventDefault();
+          setDraggingImage(false);
+          const file = ev.dataTransfer.files?.[0];
+          if (!file) return;
+          if (!/image\/(png|jpeg|jpg|webp)/i.test(file.type)) {
+            showMessage("仅支持 PNG/JPG/WebP");
+            return;
+          }
+          setFileForImage(file);
+        }
+
+        function startPan(ev) {
+          if (ev.button !== 0) return;
+          panRef.current = {
+            active: true,
+            x: ev.clientX - pan.x,
+            y: ev.clientY - pan.y,
+          };
+        }
+
+        function movePan(ev) {
+          if (!panRef.current.active) return;
+          setPan({
+            x: ev.clientX - panRef.current.x,
+            y: ev.clientY - panRef.current.y,
+          });
+        }
+
+        function endPan() {
+          panRef.current.active = false;
+        }
+
+        function zoomByWheel(ev) {
+          ev.preventDefault();
+          setZoom((z) =>
+            Math.max(0.2, Math.min(5, Number((z + (ev.deltaY < 0 ? 0.08 : -0.08)).toFixed(2))))
+          );
+        }
+
+        return (
+          <div className="min-h-screen p-3 md:p-5">
+            <div className="mx-auto max-w-[1700px] rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
+              <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+                <div>
+                  <h1 className="text-xl font-bold">SVG Studio Pro</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    文字/图片转SVG、实时编辑预览、导入导出、API可配置
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={newDocument}
+                    className="rounded-lg bg-slate-800 px-3 py-2 text-sm text-white hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600"
+                  >
+                    新建
+                  </button>
+                  <button
+                    onClick={() => fileOpenRef.current?.click()}
+                    className="rounded-lg bg-slate-200 px-3 py-2 text-sm hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                  >
+                    打开SVG
+                  </button>
+                  <button
+                    onClick={downloadSvg}
+                    className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-500"
+                  >
+                    保存SVG
+                  </button>
+                  <button
+                    onClick={copyCode}
+                    className="rounded-lg bg-slate-200 px-3 py-2 text-sm hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                  >
+                    复制代码
+                  </button>
+                  <button
+                    onClick={shareLink}
+                    className="rounded-lg bg-slate-200 px-3 py-2 text-sm hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                  >
+                    分享链接
+                  </button>
+                  <button
+                    onClick={() => setDarkMode((v) => !v)}
+                    className="rounded-lg bg-slate-200 px-3 py-2 text-sm hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                  >
+                    {darkMode ? "浅色模式" : "暗黑模式"}
+                  </button>
+                  <input
+                    ref={fileOpenRef}
+                    type="file"
+                    className="hidden"
+                    accept=".svg,image/svg+xml"
+                    onChange={(e) => handleOpenLocalSvg(e.target.files?.[0])}
+                  />
+                </div>
+              </header>
+
+              <div className="grid grid-cols-1 gap-0 lg:grid-cols-[360px_1fr]">
+                <aside className="border-r border-slate-200 p-4 dark:border-slate-800">
+                  <div className="mb-4 flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+                    <button
+                      onClick={() => setActiveTab("text")}
+                      className={cls(
+                        "flex-1 rounded-lg px-3 py-2 text-sm font-medium",
+                        activeTab === "text"
+                          ? "bg-white shadow dark:bg-slate-700"
+                          : "text-slate-500"
+                      )}
+                    >
+                      文字转SVG
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("image")}
+                      className={cls(
+                        "flex-1 rounded-lg px-3 py-2 text-sm font-medium",
+                        activeTab === "image"
+                          ? "bg-white shadow dark:bg-slate-700"
+                          : "text-slate-500"
+                      )}
+                    >
+                      图片转SVG
+                    </button>
+                  </div>
+
+                  {activeTab === "text" ? (
+                    <div className="space-y-3">
+                      <label className="block text-sm font-medium">输入文本</label>
+                      <textarea
+                        value={textForm.text}
+                        onChange={(e) =>
+                          setTextForm((s) => ({ ...s, text: e.target.value }))
+                        }
+                        className="h-28 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm outline-none focus:ring dark:border-slate-700 dark:bg-slate-900"
+                      />
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-sm">字体</label>
+                          <select
+                            value={textForm.fontFamily}
+                            onChange={(e) =>
+                              setTextForm((s) => ({
+                                ...s,
+                                fontFamily: e.target.value,
+                              }))
+                            }
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          >
+                            {FONT_OPTIONS.map((f) => (
+                              <option key={f} value={f}>
+                                {f}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-sm">字号</label>
+                          <input
+                            type="number"
+                            min="8"
+                            max="240"
+                            value={textForm.fontSize}
+                            onChange={(e) =>
+                              setTextForm((s) => ({
+                                ...s,
+                                fontSize: Number(e.target.value || 64),
+                              }))
+                            }
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-sm">填充颜色</label>
+                          <input
+                            type="color"
+                            value={textForm.fill}
+                            onChange={(e) =>
+                              setTextForm((s) => ({ ...s, fill: e.target.value }))
+                            }
+                            className="mt-1 h-10 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm">描边颜色</label>
+                          <input
+                            type="color"
+                            value={textForm.stroke === "none" ? "#000000" : textForm.stroke}
+                            onChange={(e) =>
+                              setTextForm((s) => ({ ...s, stroke: e.target.value }))
+                            }
+                            className="mt-1 h-10 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-sm">描边粗细</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="10"
+                          step="0.2"
+                          value={textForm.strokeWidth}
+                          onChange={(e) =>
+                            setTextForm((s) => ({
+                              ...s,
+                              strokeWidth: Number(e.target.value),
+                            }))
+                          }
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-sm">样式预设</label>
+                        <div className="mt-1 grid grid-cols-3 gap-2">
+                          {PRESETS.map((preset) => (
+                            <button
+                              key={preset.value}
+                              onClick={() =>
+                                setTextForm((s) => ({ ...s, preset: preset.value }))
+                              }
+                              className={cls(
+                                "rounded-lg border px-2 py-2 text-xs",
+                                textForm.preset === preset.value
+                                  ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40"
+                                  : "border-slate-300 dark:border-slate-700"
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={generateTextSvg}
+                        disabled={isBusy}
+                        className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-500 disabled:opacity-50"
+                      >
+                        {isBusy ? "生成中..." : "生成文字SVG"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDraggingImage(true);
+                        }}
+                        onDragLeave={() => setDraggingImage(false)}
+                        onDrop={onDropImage}
+                        className={cls(
+                          "rounded-xl border-2 border-dashed p-6 text-center text-sm",
+                          draggingImage
+                            ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30"
+                            : "border-slate-300 dark:border-slate-700"
+                        )}
+                      >
+                        <p>拖拽 PNG/JPG/WebP 到这里</p>
+                        <p className="my-1 text-xs text-slate-500">或</p>
+                        <button
+                          onClick={() => fileImageRef.current?.click()}
+                          className="rounded-lg bg-slate-200 px-3 py-2 text-xs hover:bg-slate-300 dark:bg-slate-800"
+                        >
+                          选择图片文件
+                        </button>
+                        <input
+                          ref={fileImageRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/jpg,image/webp"
+                          className="hidden"
+                          onChange={(e) => setFileForImage(e.target.files?.[0] || null)}
+                        />
+                        {fileForImage && (
+                          <p className="mt-2 break-all text-xs text-emerald-500">
+                            已选中：{fileForImage.name}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-sm">细节(maxEdge)</label>
+                          <input
+                            type="number"
+                            min="64"
+                            max="1200"
+                            value={imgOpts.maxEdge}
+                            onChange={(e) =>
+                              setImgOpts((s) => ({
+                                ...s,
+                                maxEdge: Number(e.target.value || 220),
+                              }))
+                            }
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm">颜色数</label>
+                          <input
+                            type="number"
+                            min="2"
+                            max="32"
+                            value={imgOpts.maxColors}
+                            onChange={(e) =>
+                              setImgOpts((s) => ({
+                                ...s,
+                                maxColors: Number(e.target.value || 12),
+                              }))
+                            }
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={generateImageSvg}
+                        disabled={isBusy}
+                        className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-500 disabled:opacity-50"
+                      >
+                        {isBusy ? "转换中..." : "生成图片SVG"}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="mt-5 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                    <h3 className="mb-2 text-sm font-semibold">API 配置（可选）</h3>
+                    <div className="space-y-2">
+                      <input
+                        placeholder="自定义 API Endpoint"
+                        value={apiConfig.endpoint}
+                        onChange={(e) =>
+                          setApiConfig((s) => ({ ...s, endpoint: e.target.value }))
+                        }
+                        className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+                      />
+                      <input
+                        placeholder="API Key"
+                        value={apiConfig.apiKey}
+                        onChange={(e) =>
+                          setApiConfig((s) => ({ ...s, apiKey: e.target.value }))
+                        }
+                        className="w-full rounded-lg border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                    <h3 className="mb-2 text-sm font-semibold">最近历史</h3>
+                    <div className="max-h-44 space-y-2 overflow-auto pr-1">
+                      {historyList.length === 0 && (
+                        <p className="text-xs text-slate-500">暂无历史记录</p>
+                      )}
+                      {historyList.map((h) => (
+                        <button
+                          key={h.id}
+                          onClick={() => setSvgCode(formatXml(h.svg))}
+                          className="w-full rounded-lg border border-slate-200 px-2 py-2 text-left text-xs hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                        >
+                          <div className="font-medium">{h.name}</div>
+                          <div className="text-slate-400">{h.time}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </aside>
+
+                <main className="p-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => exportViaApi("png")}
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs text-white hover:bg-emerald-500"
+                    >
+                      导出PNG
+                    </button>
+                    <button
+                      onClick={() => exportViaApi("pdf")}
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs text-white hover:bg-emerald-500"
+                    >
+                      导出PDF
+                    </button>
+                    <button
+                      onClick={() => exportViaApi("eps")}
+                      className="rounded-lg bg-emerald-600 px-3 py-2 text-xs text-white hover:bg-emerald-500"
+                    >
+                      导出EPS
+                    </button>
+                    <button
+                      onClick={optimizeSvgCode}
+                      className="rounded-lg bg-amber-500 px-3 py-2 text-xs text-white hover:bg-amber-400"
+                    >
+                      优化SVG
+                    </button>
+                    <button
+                      onClick={formatInEditor}
+                      className="rounded-lg bg-slate-200 px-3 py-2 text-xs hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    >
+                      自动格式化
+                    </button>
+                    <button
+                      onClick={undoEditor}
+                      className="rounded-lg bg-slate-200 px-3 py-2 text-xs hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    >
+                      撤销
+                    </button>
+                    <button
+                      onClick={redoEditor}
+                      className="rounded-lg bg-slate-200 px-3 py-2 text-xs hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    >
+                      重做
+                    </button>
+
+                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                      <label className="text-xs">背景</label>
+                      <select
+                        value={bgMode}
+                        onChange={(e) => setBgMode(e.target.value)}
+                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-900"
+                      >
+                        <option value="white">白色</option>
+                        <option value="black">黑色</option>
+                        <option value="checker">透明棋盘</option>
+                      </select>
+                      <button
+                        onClick={() => setZoom((z) => Math.max(0.2, Number((z - 0.1).toFixed(2))))}
+                        className="rounded-lg bg-slate-200 px-2 py-1 text-xs dark:bg-slate-800"
+                      >
+                        -
+                      </button>
+                      <span className="min-w-12 text-center text-xs">{Math.round(zoom * 100)}%</span>
+                      <button
+                        onClick={() => setZoom((z) => Math.min(5, Number((z + 0.1).toFixed(2))))}
+                        className="rounded-lg bg-slate-200 px-2 py-1 text-xs dark:bg-slate-800"
+                      >
+                        +
+                      </button>
+                      <button
+                        onClick={() => {
+                          setZoom(1);
+                          setPan({ x: 0, y: 0 });
+                        }}
+                        className="rounded-lg bg-slate-200 px-2 py-1 text-xs dark:bg-slate-800"
+                      >
+                        重置视图
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-800 md:grid-cols-5">
+                    <div className="md:col-span-2">
+                      <label className="text-xs">选中元素ID</label>
+                      <input
+                        value={selectedId}
+                        readOnly
+                        placeholder="点击画布元素以选中"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 p-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs">填充</label>
+                      <input
+                        type="color"
+                        value={selectedFill}
+                        onChange={(e) => {
+                          setSelectedFill(e.target.value);
+                          applyStyleToSelected("fill", e.target.value);
+                        }}
+                        className="mt-1 h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs">描边</label>
+                      <input
+                        type="color"
+                        value={selectedStroke}
+                        onChange={(e) => {
+                          setSelectedStroke(e.target.value);
+                          applyStyleToSelected("stroke", e.target.value);
+                        }}
+                        className="mt-1 h-9 w-full rounded-lg border border-slate-300 dark:border-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs">描边宽度</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.2"
+                        value={selectedStrokeWidth}
+                        onChange={(e) => {
+                          const val = Number(e.target.value || 1);
+                          setSelectedStrokeWidth(val);
+                          applyStyleToSelected("stroke-width", String(val));
+                        }}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 dark:border-slate-800 md:grid-cols-[1fr_auto_auto]">
+                    <select
+                      value={selectedId}
+                      onChange={(e) => setSelectedId(e.target.value)}
+                      className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-900"
+                    >
+                      <option value="">图层管理（选择元素）</option>
+                      {layers.map((l) => (
+                        <option key={`${l.index}-${l.id}`} value={l.id}>
+                          {l.tag} #{l.id}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => moveLayer("up")}
+                      className="rounded-lg bg-slate-200 px-3 py-2 text-xs hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    >
+                      上移图层
+                    </button>
+                    <button
+                      onClick={() => moveLayer("down")}
+                      className="rounded-lg bg-slate-200 px-3 py-2 text-xs hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    >
+                      下移图层
+                    </button>
+                  </div>
+
+                  <div className="grid grid-rows-[380px_360px] gap-3 xl:grid-rows-[430px_390px]">
+                    <section
+                      className={cls(
+                        "relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800",
+                        bgMode === "white" && "bg-white",
+                        bgMode === "black" && "bg-black",
+                        bgMode === "checker" && "checker-bg"
+                      )}
+                      onMouseDown={startPan}
+                      onMouseMove={movePan}
+                      onMouseUp={endPan}
+                      onMouseLeave={endPan}
+                      onWheel={zoomByWheel}
+                    >
+                      <div className="absolute left-3 top-2 z-10 rounded bg-slate-900/70 px-2 py-1 text-xs text-white">
+                        预览画布（滚轮缩放，拖拽平移，点击元素高亮代码）
+                      </div>
+                      <div
+                        ref={previewRef}
+                        className="h-full w-full overflow-auto p-4"
+                      />
+                    </section>
+
+                    <section className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+                      <MonacoEditor
+                        value={svgCode}
+                        onChange={setSvgCode}
+                        editorRef={editorRef}
+                      />
+                    </section>
+                  </div>
+
+                  {status && (
+                    <div className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white dark:bg-slate-100 dark:text-slate-900">
+                      {status}
+                    </div>
+                  )}
+                </main>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("app")).render(<App />);
+    </script>
+  </body>
 </html>
