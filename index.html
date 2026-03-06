@@ -3,43 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文字生成 SVG 工具</title>
+    <title>描述生成 SVG 图形</title>
     <style>
-        :root {
-            color-scheme: light;
-        }
         body {
             margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
             background: #f6f8fa;
             color: #1f2328;
         }
-        .container {
-            max-width: 960px;
-            margin: 32px auto;
+        .wrap {
+            max-width: 1024px;
+            margin: 28px auto;
             padding: 0 16px;
         }
         h1 {
-            margin-bottom: 8px;
-            font-size: 28px;
+            margin: 0 0 10px;
+            font-size: 30px;
         }
         .desc {
-            margin-top: 0;
-            margin-bottom: 20px;
+            margin: 0 0 18px;
             color: #59636e;
         }
-        .panel {
+        .card {
             background: #fff;
-            border: 1px solid #d1d9e0;
+            border: 1px solid #d0d7de;
             border-radius: 12px;
             padding: 16px;
-            box-shadow: 0 1px 2px rgba(31, 35, 40, 0.04);
-        }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px;
-            margin-bottom: 12px;
         }
         label {
             display: block;
@@ -47,102 +36,104 @@
             font-size: 14px;
             font-weight: 600;
         }
-        input, select, textarea, button {
+        textarea, input, button {
             font: inherit;
         }
-        input[type="text"],
-        input[type="number"],
-        textarea {
+        textarea, input[type="color"] {
             width: 100%;
             box-sizing: border-box;
-            border: 1px solid #d1d9e0;
+            border: 1px solid #d0d7de;
             border-radius: 8px;
             padding: 10px 12px;
             background: #fff;
         }
-        textarea {
-            min-height: 120px;
+        #promptInput {
+            min-height: 92px;
             resize: vertical;
         }
+        .grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            margin-top: 10px;
+        }
         .actions {
+            margin-top: 12px;
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
-            margin: 14px 0;
         }
         button {
             border: 1px solid #1f6feb;
-            border-radius: 8px;
             background: #1f6feb;
             color: #fff;
+            border-radius: 8px;
             padding: 8px 14px;
             cursor: pointer;
             font-weight: 600;
         }
-        button.secondary {
+        button.ghost {
             background: #fff;
             color: #1f6feb;
         }
         .output {
+            margin-top: 14px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 12px;
-            margin-top: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
         }
         #previewBox {
             border: 1px dashed #8c959f;
             border-radius: 8px;
-            background: #fff;
-            min-height: 180px;
+            min-height: 280px;
             display: flex;
             align-items: center;
             justify-content: center;
+            background: #fff;
             overflow: auto;
             padding: 8px;
         }
-        .tip {
-            margin-top: 8px;
+        #svgOutput {
+            min-height: 280px;
+            resize: vertical;
+        }
+        .tips {
+            margin-top: 10px;
             font-size: 13px;
             color: #59636e;
+            line-height: 1.6;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 1px 5px;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>文字生成 SVG 程序</h1>
-        <p class="desc">输入文字后，点击“生成 SVG”即可得到代码、预览并下载文件。</p>
+    <main class="wrap">
+        <h1>输入描述，生成 SVG 图形</h1>
+        <p class="desc">示例：<code>一只戴围巾的橘猫</code>、<code>a black cat under moonlight</code>、<code>一条小鱼在海里</code>。</p>
 
-        <div class="panel">
-            <label for="textInput">文字内容（支持多行）</label>
-            <textarea id="textInput">你好，SVG！</textarea>
+        <section class="card">
+            <label for="promptInput">描述内容</label>
+            <textarea id="promptInput">一只戴围巾的橘猫</textarea>
 
             <div class="grid">
                 <div>
-                    <label for="fontSize">字体大小（px）</label>
-                    <input id="fontSize" type="number" min="8" max="300" value="48">
+                    <label for="bgColor">背景色（可覆盖自动配色）</label>
+                    <input id="bgColor" type="color" value="#f8fafc">
                 </div>
                 <div>
-                    <label for="padding">内边距（px）</label>
-                    <input id="padding" type="number" min="0" max="300" value="24">
-                </div>
-                <div>
-                    <label for="fontFamily">字体</label>
-                    <input id="fontFamily" type="text" value="Arial, 'Microsoft YaHei', sans-serif">
-                </div>
-                <div>
-                    <label for="fillColor">文字颜色</label>
-                    <input id="fillColor" type="color" value="#111111">
-                </div>
-                <div>
-                    <label for="bgColor">背景色</label>
-                    <input id="bgColor" type="color" value="#ffffff">
+                    <label for="lineColor">线条颜色</label>
+                    <input id="lineColor" type="color" value="#1f2937">
                 </div>
             </div>
 
             <div class="actions">
                 <button id="generateBtn" type="button">生成 SVG</button>
-                <button id="downloadBtn" class="secondary" type="button">下载 SVG</button>
-                <button id="copyBtn" class="secondary" type="button">复制 SVG 代码</button>
+                <button id="downloadBtn" type="button" class="ghost">下载 SVG</button>
+                <button id="copyBtn" type="button" class="ghost">复制 SVG 代码</button>
             </div>
 
             <div class="output">
@@ -156,25 +147,22 @@
                 </div>
             </div>
 
-            <div class="tip">提示：宽高根据文字自动计算；如需透明背景，请下载后手动移除 &lt;rect&gt; 节点。</div>
-        </div>
-    </div>
+            <div class="tips">
+                当前为“描述到图形”的本地生成版本（无需后端）。已内置猫/狗/鱼/鸟/花/树/房子/机器人等识别，未识别时会自动生成抽象图形。
+            </div>
+        </section>
+    </main>
 
     <script>
-        const textInput = document.getElementById("textInput");
-        const fontSizeInput = document.getElementById("fontSize");
-        const paddingInput = document.getElementById("padding");
-        const fontFamilyInput = document.getElementById("fontFamily");
-        const fillColorInput = document.getElementById("fillColor");
+        const SIZE = 512;
+        const promptInput = document.getElementById("promptInput");
         const bgColorInput = document.getElementById("bgColor");
-        const svgOutput = document.getElementById("svgOutput");
-        const previewBox = document.getElementById("previewBox");
+        const lineColorInput = document.getElementById("lineColor");
         const generateBtn = document.getElementById("generateBtn");
         const downloadBtn = document.getElementById("downloadBtn");
         const copyBtn = document.getElementById("copyBtn");
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+        const svgOutput = document.getElementById("svgOutput");
+        const previewBox = document.getElementById("previewBox");
 
         function escapeXml(text) {
             return text
@@ -185,58 +173,286 @@
                 .replace(/'/g, "&apos;");
         }
 
-        function buildSvgFromText() {
-            const content = textInput.value || "";
-            const lines = content.split(/\r?\n/);
-            const fontSize = Math.max(8, Number(fontSizeInput.value) || 48);
-            const padding = Math.max(0, Number(paddingInput.value) || 24);
-            const fontFamily = fontFamilyInput.value.trim() || "sans-serif";
-            const fillColor = fillColorInput.value;
-            const bgColor = bgColorInput.value;
-
-            if (ctx) {
-                ctx.font = fontSize + "px " + fontFamily;
+        function hashString(input) {
+            let h = 2166136261;
+            for (let i = 0; i < input.length; i += 1) {
+                h ^= input.charCodeAt(i);
+                h = Math.imul(h, 16777619);
             }
+            return h >>> 0;
+        }
 
-            let maxWidth = 0;
-            for (const line of lines) {
-                const lineWidth = ctx ? ctx.measureText(line).width : line.length * fontSize;
-                if (lineWidth > maxWidth) maxWidth = lineWidth;
+        function mulberry32(seed) {
+            let t = seed >>> 0;
+            return function rand() {
+                t += 0x6D2B79F5;
+                let r = Math.imul(t ^ (t >>> 15), 1 | t);
+                r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+                return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function includesAny(text, words) {
+            return words.some((word) => text.includes(word));
+        }
+
+        function detectSubject(text) {
+            if (includesAny(text, ["猫", "cat", "kitten", "喵"])) return "cat";
+            if (includesAny(text, ["狗", "dog", "puppy"])) return "dog";
+            if (includesAny(text, ["鱼", "fish"])) return "fish";
+            if (includesAny(text, ["鸟", "bird"])) return "bird";
+            if (includesAny(text, ["花", "flower", "rose", "tulip"])) return "flower";
+            if (includesAny(text, ["树", "tree"])) return "tree";
+            if (includesAny(text, ["房", "屋", "house", "home"])) return "house";
+            if (includesAny(text, ["机器人", "robot", "机甲"])) return "robot";
+            return "abstract";
+        }
+
+        function detectPalette(text, manualBg) {
+            if (manualBg) {
+                return {
+                    bg: manualBg,
+                    main: "#f59e0b",
+                    second: "#fb7185",
+                    accent: "#22c55e"
+                };
             }
+            if (includesAny(text, ["夜", "moon", "night", "星空"])) {
+                return { bg: "#0f172a", main: "#f8fafc", second: "#93c5fd", accent: "#facc15" };
+            }
+            if (includesAny(text, ["海", "ocean", "sea"])) {
+                return { bg: "#dbeafe", main: "#60a5fa", second: "#2563eb", accent: "#22d3ee" };
+            }
+            return { bg: "#f8fafc", main: "#f59e0b", second: "#fb7185", accent: "#22c55e" };
+        }
 
-            const lineHeight = Math.round(fontSize * 1.4);
-            const width = Math.ceil(maxWidth + padding * 2);
-            const height = Math.ceil(lineHeight * lines.length + padding * 2);
+        function detectAnimalBodyColor(text) {
+            if (includesAny(text, ["黑", "black"])) return "#111827";
+            if (includesAny(text, ["白", "white"])) return "#f9fafb";
+            if (includesAny(text, ["灰", "gray", "grey"])) return "#9ca3af";
+            if (includesAny(text, ["橘", "orange"])) return "#f59e0b";
+            if (includesAny(text, ["棕", "brown"])) return "#92400e";
+            return "#f59e0b";
+        }
 
-            const textNodes = lines.map((line, index) => {
-                const y = padding + fontSize + index * lineHeight;
-                return "  <text x=\"" + padding + "\" y=\"" + y + "\">" + escapeXml(line) + "</text>";
-            }).join("\n");
+        function drawSkyObjects(text, rand) {
+            let nodes = "";
+            if (includesAny(text, ["夜", "moon", "night", "星空"])) {
+                nodes += "<circle cx=\"430\" cy=\"86\" r=\"34\" fill=\"#fef08a\" opacity=\"0.95\"/>";
+                for (let i = 0; i < 16; i += 1) {
+                    const x = 40 + Math.round(rand() * 430);
+                    const y = 26 + Math.round(rand() * 150);
+                    const r = 1 + rand() * 2.5;
+                    nodes += "<circle cx=\"" + x + "\" cy=\"" + y + "\" r=\"" + r.toFixed(1) + "\" fill=\"#ffffff\" opacity=\"0.85\"/>";
+                }
+            } else {
+                nodes += "<circle cx=\"430\" cy=\"86\" r=\"34\" fill=\"#fde047\" opacity=\"0.95\"/>";
+                nodes += "<ellipse cx=\"130\" cy=\"88\" rx=\"42\" ry=\"21\" fill=\"#ffffff\" opacity=\"0.85\"/>";
+                nodes += "<ellipse cx=\"168\" cy=\"88\" rx=\"30\" ry=\"16\" fill=\"#ffffff\" opacity=\"0.85\"/>";
+            }
+            return nodes;
+        }
 
-            const svg =
-                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + width + "\" height=\"" + height + "\" viewBox=\"0 0 " + width + " " + height + "\">\n" +
-                "  <rect width=\"100%\" height=\"100%\" fill=\"" + bgColor + "\"/>\n" +
-                "  <g font-size=\"" + fontSize + "\" font-family=\"" + escapeXml(fontFamily) + "\" fill=\"" + fillColor + "\">\n" +
-                textNodes + "\n" +
-                "  </g>\n" +
-                "</svg>";
+        function drawGround() {
+            return "<ellipse cx=\"256\" cy=\"438\" rx=\"180\" ry=\"34\" fill=\"#94a3b8\" opacity=\"0.24\"/>";
+        }
 
-            return svg;
+        function drawCat(text, rand, lineColor) {
+            const fur = detectAnimalBodyColor(text);
+            const eyeColor = includesAny(text, ["蓝", "blue"]) ? "#60a5fa" : "#22c55e";
+            const scarf = includesAny(text, ["围巾", "scarf"]);
+            const small = includesAny(text, ["小", "small"]) ? 0.9 : 1;
+            const big = includesAny(text, ["大", "big"]) ? 1.15 : 1;
+            const scale = small * big;
+            const stripe = includesAny(text, ["橘", "虎斑", "tabby", "条纹"]);
+            const tailBend = 30 + Math.round(rand() * 22);
+
+            let nodes = "";
+            nodes += "<g transform=\"translate(0 " + (12 - Math.round(scale * 10)) + ") scale(" + scale.toFixed(2) + ")\">";
+            nodes += "<ellipse cx=\"256\" cy=\"316\" rx=\"92\" ry=\"84\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+            nodes += "<circle cx=\"256\" cy=\"212\" r=\"86\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+            nodes += "<polygon points=\"192,160 214,92 248,154\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+            nodes += "<polygon points=\"320,160 298,92 264,154\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+            nodes += "<circle cx=\"226\" cy=\"208\" r=\"22\" fill=\"#ffffff\"/>";
+            nodes += "<circle cx=\"286\" cy=\"208\" r=\"22\" fill=\"#ffffff\"/>";
+            nodes += "<circle cx=\"226\" cy=\"210\" r=\"9\" fill=\"" + eyeColor + "\"/>";
+            nodes += "<circle cx=\"286\" cy=\"210\" r=\"9\" fill=\"" + eyeColor + "\"/>";
+            nodes += "<circle cx=\"226\" cy=\"210\" r=\"3\" fill=\"#111827\"/>";
+            nodes += "<circle cx=\"286\" cy=\"210\" r=\"3\" fill=\"#111827\"/>";
+            nodes += "<polygon points=\"256,228 244,244 268,244\" fill=\"#ef4444\"/>";
+            nodes += "<path d=\"M256 244 Q244 258 230 254\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>";
+            nodes += "<path d=\"M256 244 Q268 258 282 254\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>";
+            nodes += "<path d=\"M208 242 L164 236\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>";
+            nodes += "<path d=\"M208 252 L162 256\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>";
+            nodes += "<path d=\"M304 242 L348 236\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>";
+            nodes += "<path d=\"M304 252 L350 256\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>";
+            nodes += "<path d=\"M330 320 C390 292 406 372 364 392\" fill=\"none\" stroke=\"" + fur + "\" stroke-width=\"20\" stroke-linecap=\"round\"/>";
+            nodes += "<path d=\"M330 320 C390 " + (292 - tailBend) + " 406 372 364 392\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"4\" stroke-linecap=\"round\"/>";
+            nodes += "<ellipse cx=\"222\" cy=\"388\" rx=\"28\" ry=\"22\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+            nodes += "<ellipse cx=\"292\" cy=\"388\" rx=\"28\" ry=\"22\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+
+            if (stripe) {
+                nodes += "<path d=\"M216 176 L236 196\" stroke=\"#a16207\" stroke-width=\"5\" stroke-linecap=\"round\"/>";
+                nodes += "<path d=\"M296 176 L276 196\" stroke=\"#a16207\" stroke-width=\"5\" stroke-linecap=\"round\"/>";
+                nodes += "<path d=\"M256 164 L256 192\" stroke=\"#a16207\" stroke-width=\"5\" stroke-linecap=\"round\"/>";
+                nodes += "<path d=\"M256 300 L220 324\" stroke=\"#a16207\" stroke-width=\"6\" stroke-linecap=\"round\"/>";
+                nodes += "<path d=\"M256 300 L292 324\" stroke=\"#a16207\" stroke-width=\"6\" stroke-linecap=\"round\"/>";
+            }
+            if (scarf) {
+                nodes += "<rect x=\"186\" y=\"268\" width=\"140\" height=\"24\" rx=\"12\" fill=\"#ef4444\"/>";
+                nodes += "<rect x=\"248\" y=\"286\" width=\"18\" height=\"58\" rx=\"8\" fill=\"#ef4444\"/>";
+            }
+            nodes += "</g>";
+            return nodes;
+        }
+
+        function drawDog(text, lineColor) {
+            const fur = detectAnimalBodyColor(text) === "#f59e0b" ? "#c08457" : detectAnimalBodyColor(text);
+            return ""
+                + "<ellipse cx=\"256\" cy=\"320\" rx=\"95\" ry=\"82\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"256\" cy=\"214\" r=\"84\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<ellipse cx=\"186\" cy=\"198\" rx=\"30\" ry=\"44\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<ellipse cx=\"326\" cy=\"198\" rx=\"30\" ry=\"44\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"226\" cy=\"210\" r=\"10\" fill=\"#111827\"/>"
+                + "<circle cx=\"286\" cy=\"210\" r=\"10\" fill=\"#111827\"/>"
+                + "<ellipse cx=\"256\" cy=\"245\" rx=\"42\" ry=\"30\" fill=\"#fef3c7\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"256\" cy=\"238\" r=\"9\" fill=\"#111827\"/>"
+                + "<path d=\"M256 248 Q240 262 226 260\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+                + "<path d=\"M256 248 Q272 262 286 260\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"3\" stroke-linecap=\"round\"/>"
+                + "<ellipse cx=\"220\" cy=\"390\" rx=\"26\" ry=\"20\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<ellipse cx=\"292\" cy=\"390\" rx=\"26\" ry=\"20\" fill=\"" + fur + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+        }
+
+        function drawFish(text, lineColor) {
+            const body = includesAny(text, ["金鱼", "goldfish"]) ? "#f97316" : "#22d3ee";
+            return ""
+                + "<ellipse cx=\"252\" cy=\"262\" rx=\"120\" ry=\"72\" fill=\"" + body + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<polygon points=\"360,262 444,216 444,306\" fill=\"" + body + "\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"198\" cy=\"248\" r=\"11\" fill=\"#ffffff\"/>"
+                + "<circle cx=\"198\" cy=\"248\" r=\"5\" fill=\"#111827\"/>"
+                + "<path d=\"M132 262 Q120 266 132 274\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<path d=\"M228 212 L228 314\" stroke=\"#67e8f9\" stroke-width=\"5\" stroke-dasharray=\"10 9\"/>";
+        }
+
+        function drawBird(lineColor) {
+            return ""
+                + "<circle cx=\"252\" cy=\"246\" r=\"84\" fill=\"#fbbf24\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<polygon points=\"330,250 382,234 330,278\" fill=\"#f97316\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"232\" cy=\"236\" r=\"11\" fill=\"#111827\"/>"
+                + "<path d=\"M168 246 C140 226 122 220 102 232\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"5\" stroke-linecap=\"round\"/>"
+                + "<path d=\"M216 300 L206 338\" stroke=\"" + lineColor + "\" stroke-width=\"5\" stroke-linecap=\"round\"/>"
+                + "<path d=\"M286 300 L296 338\" stroke=\"" + lineColor + "\" stroke-width=\"5\" stroke-linecap=\"round\"/>";
+        }
+
+        function drawFlower(lineColor) {
+            return ""
+                + "<rect x=\"246\" y=\"212\" width=\"20\" height=\"192\" rx=\"10\" fill=\"#16a34a\"/>"
+                + "<circle cx=\"256\" cy=\"188\" r=\"36\" fill=\"#facc15\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"206\" cy=\"188\" r=\"28\" fill=\"#f472b6\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"306\" cy=\"188\" r=\"28\" fill=\"#f472b6\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"256\" cy=\"138\" r=\"28\" fill=\"#f472b6\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"256\" cy=\"238\" r=\"28\" fill=\"#f472b6\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<ellipse cx=\"220\" cy=\"308\" rx=\"34\" ry=\"18\" fill=\"#22c55e\"/>"
+                + "<ellipse cx=\"292\" cy=\"332\" rx=\"34\" ry=\"18\" fill=\"#22c55e\"/>";
+        }
+
+        function drawTree(lineColor) {
+            return ""
+                + "<rect x=\"232\" y=\"246\" width=\"48\" height=\"174\" rx=\"8\" fill=\"#92400e\"/>"
+                + "<circle cx=\"256\" cy=\"188\" r=\"92\" fill=\"#22c55e\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"198\" cy=\"212\" r=\"62\" fill=\"#4ade80\" opacity=\"0.82\"/>"
+                + "<circle cx=\"316\" cy=\"212\" r=\"62\" fill=\"#4ade80\" opacity=\"0.82\"/>";
+        }
+
+        function drawHouse(lineColor) {
+            return ""
+                + "<rect x=\"160\" y=\"220\" width=\"192\" height=\"180\" fill=\"#f3f4f6\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<polygon points=\"146,222 256,132 366,222\" fill=\"#ef4444\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<rect x=\"232\" y=\"300\" width=\"48\" height=\"100\" fill=\"#d97706\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<rect x=\"186\" y=\"266\" width=\"32\" height=\"32\" fill=\"#93c5fd\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<rect x=\"294\" y=\"266\" width=\"32\" height=\"32\" fill=\"#93c5fd\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+        }
+
+        function drawRobot(lineColor) {
+            return ""
+                + "<rect x=\"186\" y=\"152\" width=\"140\" height=\"132\" rx=\"16\" fill=\"#cbd5e1\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<rect x=\"196\" y=\"292\" width=\"120\" height=\"116\" rx=\"14\" fill=\"#94a3b8\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<circle cx=\"226\" cy=\"202\" r=\"14\" fill=\"#22d3ee\"/>"
+                + "<circle cx=\"286\" cy=\"202\" r=\"14\" fill=\"#22d3ee\"/>"
+                + "<rect x=\"224\" y=\"238\" width=\"64\" height=\"12\" rx=\"6\" fill=\"#111827\"/>"
+                + "<path d=\"M256 152 L256 118\" stroke=\"" + lineColor + "\" stroke-width=\"5\"/>"
+                + "<circle cx=\"256\" cy=\"108\" r=\"10\" fill=\"#f43f5e\"/>"
+                + "<rect x=\"154\" y=\"308\" width=\"24\" height=\"74\" rx=\"10\" fill=\"#cbd5e1\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>"
+                + "<rect x=\"334\" y=\"308\" width=\"24\" height=\"74\" rx=\"10\" fill=\"#cbd5e1\" stroke=\"" + lineColor + "\" stroke-width=\"4\"/>";
+        }
+
+        function drawAbstract(rand, lineColor) {
+            let nodes = "";
+            for (let i = 0; i < 8; i += 1) {
+                const x = 70 + rand() * 370;
+                const y = 90 + rand() * 340;
+                const r = 18 + rand() * 66;
+                const hue = Math.floor(rand() * 360);
+                nodes += "<circle cx=\"" + x.toFixed(1) + "\" cy=\"" + y.toFixed(1) + "\" r=\"" + r.toFixed(1) + "\" fill=\"hsla(" + hue + ",80%,60%,0.45)\" stroke=\"" + lineColor + "\" stroke-width=\"2\"/>";
+            }
+            nodes += "<path d=\"M62 418 C182 300 328 506 446 384\" fill=\"none\" stroke=\"" + lineColor + "\" stroke-width=\"6\" stroke-linecap=\"round\"/>";
+            return nodes;
+        }
+
+        function buildSvg(prompt, manualBg, lineColor) {
+            const text = (prompt || "").trim();
+            const normalized = text.toLowerCase();
+            const seed = hashString(text || "default");
+            const rand = mulberry32(seed);
+            const subject = detectSubject(normalized);
+            const palette = detectPalette(normalized, manualBg);
+            const stroke = lineColor || "#1f2937";
+
+            let figure = "";
+            if (subject === "cat") figure = drawCat(normalized, rand, stroke);
+            else if (subject === "dog") figure = drawDog(normalized, stroke);
+            else if (subject === "fish") figure = drawFish(normalized, stroke);
+            else if (subject === "bird") figure = drawBird(stroke);
+            else if (subject === "flower") figure = drawFlower(stroke);
+            else if (subject === "tree") figure = drawTree(stroke);
+            else if (subject === "house") figure = drawHouse(stroke);
+            else if (subject === "robot") figure = drawRobot(stroke);
+            else figure = drawAbstract(rand, stroke);
+
+            return ""
+                + "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + SIZE + "\" height=\"" + SIZE + "\" viewBox=\"0 0 " + SIZE + " " + SIZE + "\">"
+                + "<title>" + escapeXml(text || "generated svg") + "</title>"
+                + "<rect width=\"100%\" height=\"100%\" fill=\"" + palette.bg + "\"/>"
+                + drawSkyObjects(normalized, rand)
+                + drawGround()
+                + figure
+                + "</svg>";
         }
 
         function render() {
-            const svg = buildSvgFromText();
+            const prompt = promptInput.value;
+            const svg = buildSvg(prompt, bgColorInput.value, lineColorInput.value);
             svgOutput.value = svg;
             previewBox.innerHTML = svg;
         }
 
+        function safeFileName(input) {
+            const name = (input || "generated").trim().slice(0, 24);
+            return name
+                .replace(/[^\p{L}\p{N}\-_]+/gu, "-")
+                .replace(/-+/g, "-")
+                .replace(/^-|-$/g, "")
+                || "generated";
+        }
+
         function downloadSvg() {
             if (!svgOutput.value) render();
+            const fileName = safeFileName(promptInput.value) + ".svg";
             const blob = new Blob([svgOutput.value], { type: "image/svg+xml;charset=utf-8" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = "text.svg";
+            a.download = fileName;
             a.click();
             URL.revokeObjectURL(url);
         }
@@ -246,15 +462,12 @@
             try {
                 await navigator.clipboard.writeText(svgOutput.value);
                 copyBtn.textContent = "已复制";
-                setTimeout(() => {
-                    copyBtn.textContent = "复制 SVG 代码";
-                }, 1200);
-            } catch (err) {
+            } catch (error) {
                 copyBtn.textContent = "复制失败";
-                setTimeout(() => {
-                    copyBtn.textContent = "复制 SVG 代码";
-                }, 1200);
             }
+            setTimeout(() => {
+                copyBtn.textContent = "复制 SVG 代码";
+            }, 1200);
         }
 
         generateBtn.addEventListener("click", render);
